@@ -21,14 +21,17 @@
 #define SSHPORT 22
 #define DSTPORT 3690
 
-#define SSHADDR "127.0.0.1"
+#define BUFSIZE 1024
+
+#define SSHADDR "212.191.89.2"
+// #define SSHADDR "127.0.0.1"
 #define DSTADDR "91.185.186.43"
 
 int main() {
 	struct sockaddr_in ssh1;
 	struct sockaddr_in dst1;
 	int e;
-	char buf[3];
+	char buf[1024];
 
 	int s = socket(PF_INET, SOCK_STREAM, 0);
 	if (s < 0 ) {
@@ -74,19 +77,25 @@ int main() {
 
 		if (FD_ISSET(s, &readfds)) {
 			int n = read(s, buf, sizeof(buf));
+			printf("read %d from ssh server\n", n); fflush(stdout);
 			if (n <= 0) {
 				perror("read(s)");
 				return 0;
 			}
-			write(d, buf, n);
+			n = write(d, buf, n);
+			fsync(d);
+			printf("wrote %d to remote\n", n); fflush(stdout);
 		}
 		if (FD_ISSET(d, &readfds)) {
 			int n = read(d, buf, sizeof(buf));
+			printf("read %d from remote\n", n); fflush(stdout);
 			if (n <= 0) {
 				perror("read(d)");
 				return 0;
 			}
-			write(s, buf, n);
+			n = write(s, buf, n);
+			fsync(s);
+			printf("wrote %d to remote\n", n); fflush(stdout);
 		}
 	}
 
