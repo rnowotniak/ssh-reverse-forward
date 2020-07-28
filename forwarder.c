@@ -17,6 +17,9 @@
 #include <netinet/in.h>
 #include <netinet/ip.h> 
 #include <sys/select.h> 
+#include <signal.h> 
+
+#define DEBUG 0
 
 #define SSHPORT 22
 #define DSTPORT 3690
@@ -32,6 +35,24 @@ int main() {
 	struct sockaddr_in dst1;
 	int e;
 	char buf[1024];
+
+#if DEBUG == 0
+	// demonize
+	if (fork() > 0) {
+		return 0;
+	}
+	setsid();
+	signal(SIGHUP, SIG_IGN);
+	signal(SIGCHLD, SIG_IGN);
+	if (fork() > 0) {
+		return 0;
+	}
+	int x;
+	for (x = sysconf(_SC_OPEN_MAX); x>=0; x--)
+	{
+		close (x);
+	}
+#endif
 
 	int s = socket(PF_INET, SOCK_STREAM, 0);
 	if (s < 0 ) {
@@ -77,25 +98,33 @@ int main() {
 
 		if (FD_ISSET(s, &readfds)) {
 			int n = read(s, buf, sizeof(buf));
+#if DEBUG == 1
 			printf("read %d from ssh server\n", n); fflush(stdout);
+#endif
 			if (n <= 0) {
 				perror("read(s)");
 				return 0;
 			}
 			n = write(d, buf, n);
 			fsync(d);
+#if DEBUG == 1
 			printf("wrote %d to remote\n", n); fflush(stdout);
+#endif
 		}
 		if (FD_ISSET(d, &readfds)) {
 			int n = read(d, buf, sizeof(buf));
+#if DEBUG == 1
 			printf("read %d from remote\n", n); fflush(stdout);
+#endif
 			if (n <= 0) {
 				perror("read(d)");
 				return 0;
 			}
 			n = write(s, buf, n);
 			fsync(s);
+#if DEBUG == 1
 			printf("wrote %d to remote\n", n); fflush(stdout);
+#endif
 		}
 	}
 
