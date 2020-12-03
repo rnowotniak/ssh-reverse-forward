@@ -29,12 +29,6 @@
 #define DEBUG 0
 #endif
 
-/*
-#define SSHADDR "212.191.89.2"
-#define SSHPORT 22
-#define DSTADDR "91.185.186.43"
-#define DSTPORT 3690
-*/
 
 #define BUFSIZE 1024
 #define ENV_VAR_NAME "SSH_PORT_DST_PORT"
