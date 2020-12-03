@@ -2,6 +2,11 @@
  * Forwarder of local sshd service via reverse connection
  * Robert Nowotniak <rnowotniak@gmail.com>  2020
  *
+ * --
+ *
+ * the second required tunnel can be run as:
+ * socat  tcp-listen:3690,reuseaddr,fork,nodelay tcp-listen:3691,reuseaddr,fork,nodelay
+ *
  */
 
 #include <stdio.h>
@@ -20,16 +25,19 @@
 #include <sys/select.h> 
 #include <signal.h> 
 
+#ifndef DEBUG
 #define DEBUG 0
+#endif
 
+/*
+#define SSHADDR "212.191.89.2"
 #define SSHPORT 22
+#define DSTADDR "91.185.186.43"
 #define DSTPORT 3690
+*/
 
 #define BUFSIZE 1024
 
-#define SSHADDR "212.191.89.2"
-// #define SSHADDR "127.0.0.1"
-#define DSTADDR "91.185.186.43"
 
 
 static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
@@ -93,6 +101,10 @@ unsigned char *base64_decode(const char *data,
 
 
 
+void usage_and_quit(char *argv0) {
+	printf("Usage: %s <anything> <base64(SrcIp:port)> <base64(DstIp:port)>\n", argv0);
+	exit(-1);
+}
 
 int main(int argc, char *argv[]) {
 	struct sockaddr_in ssh1;
@@ -101,21 +113,31 @@ int main(int argc, char *argv[]) {
 	char buf[1024];
 
 	if (argc != 4) {
-		printf("Usage: %s <anything> <base64(SshIp:port)> <base64(DstIp:porrt)>\n", argv[0]);
-		return 1;
+		usage_and_quit(argv[0]);
 	}
 
 	size_t ssh_len;
-	unsigned char *p = base64_decode(argv[2], strlen(argv[2]), &ssh_len);
+	unsigned char *sshaddr = base64_decode(argv[2], strlen(argv[2]), &ssh_len);
 
 	size_t dst_len;
-	unsigned char *p2 = base64_decode(argv[3], strlen(argv[3]), &dst_len);
+	unsigned char *dstaddr = base64_decode(argv[3], strlen(argv[3]), &dst_len);
 
-	printf("%s\n", p);
-	printf("%s\n", p2);
+	if (!sshaddr || !dstaddr || !index(sshaddr, ':') || !index(dstaddr, ':')) {
+		usage_and_quit(argv[0]);
+	}
 
+	char *sshport = index(sshaddr, ':');
+	char *dstport = index(dstaddr, ':');
+	*sshport++ = '\0';
+	*dstport++ = '\0';
 
-	return 0;
+#if DEBUG == 1
+	printf("%s\n", sshaddr);
+	printf("%s\n", sshport);
+	printf("%s\n", dstaddr);
+	printf("%s\n", dstport);
+#endif
+
 
 #if DEBUG == 0
 	// demonize
@@ -148,8 +170,8 @@ int main(int argc, char *argv[]) {
 
 	// Connect to ssh server
 	ssh1.sin_family = AF_INET;
-	ssh1.sin_port = htons(SSHPORT);
-	e = inet_pton(AF_INET, SSHADDR, &ssh1.sin_addr);
+	ssh1.sin_port = htons(atoi(sshport));
+	e = inet_pton(AF_INET, sshaddr, &ssh1.sin_addr);
 	e = connect(s, (const struct sockaddr *) &ssh1, sizeof(ssh1) );
 	if (e < 0 ) {
 		perror("connect to ssh");
@@ -159,8 +181,8 @@ int main(int argc, char *argv[]) {
 
 	// Connect to listening port to forward ssh there
 	dst1.sin_family = AF_INET;
-	dst1.sin_port = htons(DSTPORT);
-	e = inet_pton(AF_INET, DSTADDR, &dst1.sin_addr);
+	dst1.sin_port = htons(atoi(dstport));
+	e = inet_pton(AF_INET, dstaddr, &dst1.sin_addr);
 	e = connect(d, (const struct sockaddr *) &dst1, sizeof(dst1) );
 	if (e < 0 ) {
 		perror("connect to listening address");
