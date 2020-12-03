@@ -37,6 +37,7 @@
 */
 
 #define BUFSIZE 1024
+#define ENV_VAR_NAME "SSH_PORT_DST_PORT"
 
 
 
@@ -102,7 +103,7 @@ unsigned char *base64_decode(const char *data,
 
 
 void usage_and_quit(char *argv0) {
-	printf("Usage: %s <anything> <base64(SrcIp:port)> <base64(DstIp:port)>\n", argv0);
+	printf("Usage: %s <anything> <base64(SrcIp:port)> <base64(DstIp:port)>\n  or environment variable is needed\n", argv0);
 	exit(-1);
 }
 
@@ -111,25 +112,47 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in dst1;
 	int e;
 	char buf[1024];
+	unsigned char *sshaddr;
+	unsigned char *dstaddr;
+	char *sshport;
+	char *dstport;
 
-	if (argc != 4) {
+	char *p = getenv(ENV_VAR_NAME);
+	if (!p && argc != 4) {
 		usage_and_quit(argv[0]);
 	}
 
-	size_t ssh_len;
-	unsigned char *sshaddr = base64_decode(argv[2], strlen(argv[2]), &ssh_len);
+	if (argc == 4) {
+		size_t ssh_len;
+		sshaddr = base64_decode(argv[2], strlen(argv[2]), &ssh_len);
 
-	size_t dst_len;
-	unsigned char *dstaddr = base64_decode(argv[3], strlen(argv[3]), &dst_len);
+		size_t dst_len;
+		dstaddr = base64_decode(argv[3], strlen(argv[3]), &dst_len);
 
-	if (!sshaddr || !dstaddr || !index(sshaddr, ':') || !index(dstaddr, ':')) {
-		usage_and_quit(argv[0]);
+		if (!sshaddr || !dstaddr || !index(sshaddr, ':') || !index(dstaddr, ':')) {
+			usage_and_quit(argv[0]);
+		}
+
+		sshport = index(sshaddr, ':');
+		dstport = index(dstaddr, ':');
+		*sshport++ = '\0';
+		*dstport++ = '\0';
+	} else {
+		// ENV_VAR_NAME is present in environment, so take from there
+		sshaddr = p;
+
+		sshport = index(p, ' ');
+		if (!sshport) usage_and_quit(argv[0]);
+		*sshport++ = '\0';
+
+		dstaddr = index(sshport, ' ');
+		if (!dstaddr) usage_and_quit(argv[0]);
+		*dstaddr++ = '\0';
+
+		dstport = index(dstaddr, ' ');
+		if (!dstport) usage_and_quit(argv[0]);
+		*dstport++ = '\0';
 	}
-
-	char *sshport = index(sshaddr, ':');
-	char *dstport = index(dstaddr, ':');
-	*sshport++ = '\0';
-	*dstport++ = '\0';
 
 #if DEBUG == 1
 	printf("%s\n", sshaddr);
