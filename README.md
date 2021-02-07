@@ -1,6 +1,7 @@
+# SSH Reverse Forward
 
+## Configuration
 
-procmailrc:
 ```
 $ cat .procmailrc
 LOGFILE=$HOME/procmail.log
@@ -16,6 +17,7 @@ VERBOSE=off
 ! rnowotniak@YYYYYYYYYYY.com
 ```
 
+## Usage
 
 ```
 $ bin/formail
